@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang | default: "en-US" }}">
+  <head>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+{% seo %}
+  </head>
+  <body>
+    <header>
+      <div class="container" align="center">
+        <h1>{{ site.title | default: site.github.repository_name }}</h1>
+      </div>
+    </header>
+    <div class="container">
+      <div class="container" align="center">
+        <img src="/statics/nubarrones.png" alt="nubarrones" height="170" width="170"/>
+      </div>
+      <div class="container" align="center">
+        <section id="downloads">
+          <a href="https://github.com/little-angry-clouds/charts" class="btn btn-github"><span class="icon"></span>Charts Repository</a>
+        </section>
+      </div>
+    </div>
+    <div class="container">
+      <section id="main_content">
+        {{ content }}
+      </section>
+    </div>
+  </body>
+</html>

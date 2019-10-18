@@ -1,0 +1,26 @@
+apiVersion: v1
+entries:
+  haproxy-network-ingress:
+  - apiVersion: v1
+    appVersion: "1.0"
+    created: "2019-11-09T12:17:20.397633973+01:00"
+    description: Haproxy Network Ingress
+    digest: d905613ad3b394e49633b8227c1015fce449f807ee98afcbf8116cb41d4e6c12
+    home: https://github.com/little-angry-clouds/charts/tree/master/haproxy-network-ingress
+    maintainers:
+    - email: alexperezpujol@disroot.org
+      name: Álex Pérez
+    name: haproxy-network-ingress
+    urls:
+    - https://little-angry-clouds.github.io/haproxy-network-ingress-0.1.1.tgz
+    version: 0.1.1
+  - apiVersion: v1
+    appVersion: "1.0"
+    created: "2019-11-09T12:06:47.961145265+01:00"
+    description: A Helm chart for Kubernetes
+    digest: d7f3471f313cfe1a4a55e905e377ae39f9a883cd465a601f90b395404f0ec8ba
+    name: haproxy-network-ingress
+    urls:
+    - https://little-angry-clouds.github.io/little-angry-clouds/haproxy-network-ingress-0.1.0.tgz
+    version: 0.1.0
+generated: "2019-11-09T12:17:20.396964802+01:00"
