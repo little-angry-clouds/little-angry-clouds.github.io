@@ -2,6 +2,19 @@ apiVersion: v1
 entries:
   haproxy-network-ingress:
   - apiVersion: v1
+    appVersion: 0.1.5
+    created: "2019-11-16T21:18:22.807225926+01:00"
+    description: Haproxy Network Ingress
+    digest: 670d8a62aa3098d89c0ebcd81120bcc55d5accd6380c1327d3021493824c16e6
+    home: https://github.com/little-angry-clouds/charts/tree/master/haproxy-network-ingress
+    maintainers:
+    - email: alexperezpujol@disroot.org
+      name: Álex Pérez
+    name: haproxy-network-ingress
+    urls:
+    - https://little-angry-clouds.github.io/haproxy-network-ingress-0.1.2.tgz
+    version: 0.1.2
+  - apiVersion: v1
     appVersion: "1.0"
     created: "2019-11-09T12:17:20.397633973+01:00"
     description: Haproxy Network Ingress
@@ -23,4 +36,4 @@ entries:
     urls:
     - https://little-angry-clouds.github.io/little-angry-clouds/haproxy-network-ingress-0.1.0.tgz
     version: 0.1.0
-generated: "2019-11-09T12:17:20.396964802+01:00"
+generated: "2019-11-16T21:18:22.806441179+01:00"
