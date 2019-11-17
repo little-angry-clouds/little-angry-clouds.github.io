@@ -35,6 +35,8 @@ then
     echo "Update repository"
     mv $tmp_charts/*.tgz little-angry-clouds
     git add index.yaml little-angry-clouds
+    # Nasty HACK
+    sed -i "s/little-angry-clouds.github.io\/haproxy-network-ingress/little-angry-clouds.github.io\/little-angry-clouds\/haproxy-network-ingress/g" index.yaml
     git commit -m "[ci] Update or add new pacakges"
 else
     git checkout index.yaml
