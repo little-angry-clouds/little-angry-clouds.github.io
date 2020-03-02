@@ -50,6 +50,6 @@ check_if_readme_staged=$(git status --porcelain index.md README.md)
 if [[ -n "$check_if_readme_staged" ]]
 then
     echo "Update README"
-    git add index.md README.md
+    git add index.md README.md index.yaml
     git commit -m "[ci] Update README"
 fi
