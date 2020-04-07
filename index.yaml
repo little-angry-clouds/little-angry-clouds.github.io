@@ -7,13 +7,13 @@ entries:
     description: An Alert Manager receiver that executes arbitrary commands when receiving
       alerts.
     digest: 09eeeeb9142397ad88458bd51f9fc124a8dd3fec3aedca840760492c3da2cfb3
-    home: https://github.com/little-angry-clouds/alertmanager-actions
+    home: https://github.com/little-angry-clouds/little-angry-clouds/alertmanager-actions
     maintainers:
     - email: alexperezpujol@disroot.org
       name: Álex Pérez
     name: alertmanager-actions
     urls:
-    - https://little-angry-clouds.github.io/alertmanager-actions-0.1.0.tgz
+    - https://little-angry-clouds.github.io/little-angry-clouds/alertmanager-actions-0.1.0.tgz
     version: 0.1.0
   haproxy-network-ingress:
   - apiVersion: v1
@@ -27,7 +27,7 @@ entries:
       name: Álex Pérez
     name: haproxy-network-ingress
     urls:
-    - https://little-angry-clouds.github.io/haproxy-network-ingress-0.1.7.tgz
+    - https://little-angry-clouds.github.io/little-angry-clouds/haproxy-network-ingress-0.1.7.tgz
     version: 0.1.7
   - apiVersion: v1
     appVersion: 0.2.1

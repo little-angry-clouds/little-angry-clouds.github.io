@@ -37,6 +37,7 @@ then
     git add index.yaml little-angry-clouds
     # Nasty HACK
     sed -i "s/little-angry-clouds.github.io\/haproxy-network-ingress/little-angry-clouds.github.io\/little-angry-clouds\/haproxy-network-ingress/g" index.yaml
+    sed -i "s/little-angry-clouds.github.io\/alertmanager-actions/little-angry-clouds.github.io\/little-angry-clouds\/alertmanager-actions/g" index.yaml
     git commit -m "[ci] Update or add new pacakges"
 else
     git checkout index.yaml
