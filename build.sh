@@ -47,7 +47,7 @@ fi
 cp $charts/README.md README.md
 grep -v "^# Little" $charts/README.md > index.md
 
-check_if_readme_staged=$(git status --porcelain index.md README.md)
+check_if_readme_staged=$(git status --porcelain index.md README.md index.yaml)
 if [[ -n "$check_if_readme_staged" ]]
 then
     echo "Update README"
