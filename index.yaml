@@ -13,7 +13,7 @@ entries:
       name: Álex Pérez
     name: alertmanager-actions
     urls:
-    - https://little-angry-clouds.github.io/alertmanager-actions-0.1.10.tgz
+    - https://little-angry-clouds.github.io/little-angry-clouds/alertmanager-actions-0.1.10.tgz
     version: 0.1.10
   - apiVersion: v1
     appVersion: "1.0"
@@ -153,7 +153,7 @@ entries:
       name: Álex Pérez
     name: haproxy-network-ingress
     urls:
-    - https://little-angry-clouds.github.io/haproxy-network-ingress-0.1.7.tgz
+    - https://little-angry-clouds.github.io/little-angry-clouds/haproxy-network-ingress-0.1.7.tgz
     version: 0.1.7
   - apiVersion: v1
     appVersion: 0.2.1
