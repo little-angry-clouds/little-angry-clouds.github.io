@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>Discos multiAZ en Kubernetes desplegado en AWS</title>
+<meta name="author" content="drymer"/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.css"/>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/theme/blood.css" id="theme"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/plugin/highlight/zenburn.css"/>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section id="sec-title-slide">
+<h1 class="title">Discos multiAZ en Kubernetes desplegado en AWS</h1>
+</section>
+
+<section>
+<section id="slide-orga3dfe60">
+<h2 id="orga3dfe60">El problema</h2>
+<p>
+En AWS se recomienda repartir las cargas de trabajo en las AZ disponibles de la región. Por ejemplo, si se tiene un grupo de instancias en la región de Irlanda, es recomendable que este pueda levantar instancias en las zonas a, b y c.
+</p>
+
+<p>
+Por otro lado, no es posible usar los discos de AWS (<a href="https://aws.amazon.com/es/ebs/?ebs-whats-new.sort-by=item.additionalFields.postDateTime&amp;ebs-whats-new.sort-order=desc">EBS</a>) en más de una AZ. Es decir, si tienes un ASG con una instancia en la zona a y un disco y esa zona cae, aunque la instancia se podrá levantar en la zona b, podrá enlazar el disco.
+</p>
+
+<p>
+Se podría argumentar que no es un problema, debido a que un sistema de ficheros distribuido no suele ser necesario. Y para cuando lo es, hay soluciones cómo <a href="https://docs.aws.amazon.com/efs/latest/ug/whatisefs.html">EFS</a> (NFS de toda la vida pero con &laquo;Elástico&raquo; en el nombre para ser moderno) o <a href="https://docs.aws.amazon.com/fsx/latest/WindowsGuide/what-is.html">FSx</a> para <a href="https://media.giphy.com/media/k2A4gzRxDL4GI/giphy.gif">Windows Server</a>.
+</p>
+
+<p>
+Pero seria un argumento pobre. EFS (NFS) no es un sistema de ficheros de verdad (<a href="https://es.wikipedia.org/wiki/Network_File_System#Operaciones">no soporta</a> las mismas órdenes del kernel que un sistema de ficheros normal) y es <a href="https://medium.com/@evanescence1106/amazon-efs-cost-explanation-5e09ef01267">caro</a> (en el articulo se argumenta que hasta 10x más). Debido a que no es un sistema de ficheros de verdad, hay muchos componentes que necesitan escribir datos en disco que o no soportan NFS o no se recomienda. Véase <a href="https://prometheus.io/docs/prometheus/latest/storage/#operational-aspects">Prometheus</a>, <a href="https://dev.mysql.com/doc/refman/8.0/en/disk-issues.html">MySQL</a> o <a href="https://docs.mongodb.com/manual/administration/production-notes/#remote-filesystems">MongoDB</a>. Evidentemente, FSx no es relevante.
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-org9fabdfc">
+<h2 id="org9fabdfc">Demo del problema</h2>
+<p>
+Para visualizar el problema, supongamos el siguiente escenario. Tenemos un cluster de EKS con un ASG en la región de Irlanda, con soporte para las 3 zonas y tenemos dos nodos que está cada uno en una AZ. Creamos un despliegue con un PVC asociado, que caerá en la zona que sea. Se despliega correctamente y somos felices. Ahora, resulta que hay una incidencia en esa zona, por lo que k8s redistribuye la carga. Pero el pod no arranca, en vez de estar en estado &laquo;Running&raquo;, se queda en &laquo;Pending&raquo;. En la descripción de este vemos <code>node(s) had volume node affinity conflict</code>.
+</p>
+
+<p>
+Para emularlo, pondremos un <a href="https://kubernetes.io/es/docs/concepts/architecture/nodes/#administraci%C3%B3n-manual-de-nodos">cordon</a> en el nodo en el que esté el pod desplegado y borraremos el pod, para forzar que vaya al nodo de la zona b.
+</p>
+
+<div class="org-src-container">
+
+<pre><code class="bash" ># Se presupone que el terraform está aplicado. Mirar última página para ver el código
+node=$(kubectl get pod -l estado=triste -o json | jq -r '.items[0].spec.nodeName')
+kubectl cordon $node
+pod=$(kubectl get pod -l estado=triste -o json | jq -r '.items[0].metadata.name')
+kubectl delete pod $pod
+</code></pre>
+</div>
+
+<p>
+OpenEBS soluciona muchos problemas, pero este en concreto es el que intentaremos solucionar: Cómo tener discos usables en distintas AZ en Kubernetes desplegado en AWS.
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-org949c96b">
+<h2 id="org949c96b">¿Por que pasa esto?</h2>
+<p>
+¿Si no nos tenemos que preocupar de que un pod esté en la zona a o b, por que nos tenemos que preocupar que un disco esté en la zona a o b?
+</p>
+
+<p>
+La gestión de discos sigue siendo un problema que Kubernetes no entiende. De la misma forma que puede <a href="https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer">crear balanceadores</a> en muchos proveedores, la gestión de los discos no está estandarizada. No existe un recurso que sea &laquo;disco&raquo; y que funcione mágicamente en AWS <b><b>y</b></b> en GCP.
+</p>
+
+<p>
+Una primera aproximación a este problema son los StorageClass, pero en cada proveedor funcionan diferente. En AWS por defecto se llama <code>gp2</code> y usa aws-ebs. Pero en GCP se llama <code>standard</code> y usa gce-pd.
+</p>
+
+<p>
+Dejaremos de preocuparnos con esto cuando se use el estándar CSI (Container Storage Interface). Una parte de la <a href="https://github.com/container-storage-interface/spec/blob/master/spec.md">especificación</a> (buscar por TopologyRequirement) contempla la MultiAZ.
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-org215858a">
+<h2 id="org215858a">OpenEBS</h2>
+<p>
+&laquo;OpenEBS construye en kubernetes para permitir a aplicaciones con estado acceder facilmente a Volúmens Físicos replicados o locales. Usando el patrón Container Attached Storage (Almacenamiento Enlazado al Contenedor) se consigue menor coste, mayor facilidad de operación y mayor control.&raquo;
+</p>
+
+<p>
+En el patrón CAS el dato está lo más cerca posible a la aplicación, siendo gestionado como un microservicio. De esta forma se desacopla los datos de los nodos.
+</p>
+
+
+<div id="org39e3da2" class="figure">
+<p><img src="./img/cas.png" alt="cas.png" />
+</p>
+</div>
+
+</section>
+</section>
+<section>
+<section id="slide-org16156e5">
+<h2 id="org16156e5">Backends para OpenEBS</h2>
+<p>
+Las posibilidades son:
+</p>
+<ul>
+<li>Jiva: En un principio fue un <a href="https://github.com/openebs/openebs/blob/9dca8cc7e6bd2aae83b2eeb522d3556990d78d84/contribute/design/README.md#jiva">fork de Longhorn</a>. Nació debido a que en el inicio, Longhorn estaba más enfocado a Docker y OpenEBS a Kubernetes. Es el backend recomendado por su simplicidad.</li>
+<li>cStor: Soporta lo mismo que Jiva, pero da mucho mas control a lo que se puede hacer. Se pueden añadir y quitar discos en caliente, Thin Provisioning (el disco crece de forma dinámica), entre otros.</li>
+<li>Local PV: Permite crear PV en función a una ruta en la máquina. Tiene sentido cuando no se necesita replicación de los datos, se requiere una mayor velocidad de escritura y/o se gestionan los discos &laquo;manualmente&raquo; en el propio host.</li>
+<li>Container Storage Interface (alpha): Este será el backend a usar cuando esté estable por lo mencionado anteriormente.</li>
+
+</ul>
+
+<p>
+<a href="https://docs.openebs.io/v160/docs/next/casengines.html#cstor-vs-jiva-vs-localpv-features-comparison">Aquí</a> hay una tabla para ayudar a escoger cual es el mejor backend.
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-orge80fc75">
+<h2 id="orge80fc75">Cómo usar OpenEBS</h2>
+<p>
+Veremos un ejemplo con el backend Jiva. El proceso es:
+</p>
+<ul>
+<li>Instalar OpenEBS</li>
+<li>Crear un StoragePool: configura los discos que usará el StorageClass</li>
+<li>Crear un StorageClass que use la StoragePool</li>
+<li>Crear un recurso que use un PVC</li>
+<li>Emular la caída de una az</li>
+
+</ul>
+
+<div class="org-src-container">
+
+<pre><code class="bash" >node=$(kubectl get pod -l estado=contento -o json | jq -r '.items[0].spec.nodeName')
+echo $node
+kubectl cordon $node
+pod=$(kubectl get pod -l estado=contento -o json | jq -r '.items[0].metadata.name')
+kubectl delete pod $pod
+kubectl get pod -l estado=contento -o json | jq -r '.items[0].spec.nodeName'
+</code></pre>
+</div>
+
+<p>
+Si todo ha ido bien, el pod se recreará sin problemas.
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-org154a188">
+<h2 id="org154a188">Cómo funciona OpenEBS</h2>
+<p>
+La clave de todo es que usa iSCSI (internet Small Computer System Interface). Provee acceso a dispositivos de almacenamiento a nivel de bloque a través de la red, a diferencia de NFS que lo hace a nivel del sistema de ficheros.
+</p>
+
+<p>
+El protocolo permite a los clientes enviar órdenes a los dispositivos y crea la ilusión de que los discos están enlazados en local (aparecen en <code>/dev/sdx</code>).
+</p>
+
+<p>
+Teoricamente, NFS y iSCSI se parecen, ambos son protocolos para compartir datos. La diferencia es que NFS no soporta las mismas órdenes del kernel que un sistema de ficheros normal. Por ello, en ciertas ocasiones, simplemente no sirve.
+</p>
+
+<p>
+Se suele decir que NFS es más lento, pero parece ser que en lo que al protocolo se refiere, la velocidad no es un problema.
+</p>
+
+<p>
+En resumen, OpenEBS funciona por que los discos see montan a nivel de red, no se montan gp2 literalmente en el panel de AWS.
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-org270b4da">
+<h2 id="org270b4da">&laquo;Esquema&raquo; de como funciona OpenEBS</h2>
+
+<div id="org95c7a55" class="figure">
+<p><img src="./img/esquema-cutre.png" alt="esquema-cutre.png" />
+</p>
+</div>
+</section>
+</section>
+<section>
+<section id="slide-org608add2">
+<h2 id="org608add2">MultiAZ</h2>
+<p>
+En este caso, MultiAZ quiere decir que se puede usar desde más de una AZ, pero no que haya alta disponibilidad de AZ. Para hacerlo, habría que tener varias replicas del mismo disco en estas AZ. Esto se configura en el StorageClass:
+</p>
+
+<div class="org-src-container">
+
+<pre><code class="yaml" >apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: openebs-jiva-gpd-3repl
+  annotations:
+    openebs.io/cas-type: jiva
+    cas.openebs.io/config: |
+      - name: ReplicaCount
+        value: "3"
+    ...
+provisioner: openebs.io/provisioner-iscsi
+</code></pre>
+</div>
+
+<p>
+Para conseguir que cada copia esté en una AZ se puede anti-afinidades, de la misma forma que se usaria con un despliegue. En esta tabla se pueden consultar todos los <a href="https://docs.openebs.io/docs/next/jivaguide.html#setting-up-jiva-storage-policies">parámetros de configuración</a>.
+</p>
+
+<p>
+Al añadir más replicas, se consigue que el deploy <code>pvc-#-rep-#</code> tenga más de un pod. Estos pods se usan para sincronizar los discos de un nodo a otro.
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-orgbac9315">
+<h2 id="orgbac9315">Gestión de discos</h2>
+<p>
+OpenEBS es un servicio que permite a k8s tener discos. Pero para poder ofrecerlos, tiene que tenerlos disponibles. Desde k8s solo se configura la ruta en la que guardar los datos:
+</p>
+
+<div class="org-src-container">
+
+<pre><code class="yaml" >kind: StoragePool
+apiVersion: openebs.io/v1alpha1
+metadata:
+  name: openebs-jiva-poc
+spec:
+  path: /mnt/openebs/
+</code></pre>
+</div>
+
+</section>
+</section>
+<section>
+<section id="slide-orgd208387">
+<h2 id="orgd208387">POC</h2>
+<p>
+La presentación está disponible <a href="https://little-angry-clouds.github.io/talks/openebs/2021-01/index.html">aquí</a>. Y el código de la POC, <a href="https://github.com/little-angry-clouds/little-angry-clouds.github.io/tree/master/talks/openebs/2021-01/code">aquí</a>.
+</p>
+</section>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js/plugin/notes/notes.js"></script>
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+
+controls: true,
+progress: true,
+history: false,
+center: true,
+slideNumber: 'c',
+rollingLinks: false,
+keyboard: true,
+mouseWheel: false,
+fragmentInURL: false,
+hashOneBasedIndex: false,
+pdfSeparateFragments: true,
+
+overview: true,
+width: 1500,
+height: 1000,
+margin: 0.10,
+minScale: 0.50,
+maxScale: 2.50,
+
+transition: 'fade',
+transitionSpeed: 'default',
+
+// Plugins with reveal.js 4.x
+plugins: [ RevealHighlight, RevealNotes ],
+
+// Optional libraries used to extend reveal.js
+dependencies: [
+]
+
+});
+</script>
+</body>
+</html>
