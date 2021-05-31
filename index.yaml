@@ -3,6 +3,20 @@ entries:
   alertmanager-actions:
   - apiVersion: v1
     appVersion: 0.2.0
+    created: "2021-05-31T08:16:14.107200559+02:00"
+    description: An Alert Manager receiver that executes arbitrary commands when receiving
+      alerts.
+    digest: a992f3e4f2485f44334e45cbeb4359e275ef4d0f97df10d3caf2e5b7d935680a
+    home: https://github.com/little-angry-clouds/alertmanager-actions
+    maintainers:
+    - email: alexperezpujol@disroot.org
+      name: Álex Pérez
+    name: alertmanager-actions
+    urls:
+    - https://little-angry-clouds.github.io/little-angry-clouds/alertmanager-actions-0.2.1.tgz
+    version: 0.2.1
+  - apiVersion: v1
+    appVersion: 0.2.0
     created: "2020-07-02T19:18:05.432177729+02:00"
     description: An Alert Manager receiver that executes arbitrary commands when receiving
       alerts.
@@ -158,9 +172,9 @@ entries:
   haproxy-network-ingress:
   - apiVersion: v1
     appVersion: 0.2.2
-    created: "2020-07-02T19:18:05.432863292+02:00"
+    created: "2021-05-31T08:16:14.107639049+02:00"
     description: Haproxy Network Ingress
-    digest: 54b7c674ae6f53c4c3542cc8d86ec40c245ae96af682e8d605c103ed45d58739
+    digest: 30e72c5ad340ae9df4bf525eb457123e809c0f425ae5a64aef117c5643407c66
     home: https://github.com/little-angry-clouds/charts/tree/master/haproxy-network-ingress
     maintainers:
     - email: alexperezpujol@disroot.org
@@ -256,4 +270,4 @@ entries:
     urls:
     - https://little-angry-clouds.github.io/little-angry-clouds/haproxy-network-ingress-0.1.0.tgz
     version: 0.1.0
-generated: "2020-07-02T19:18:05.431229309+02:00"
+generated: "2021-05-31T08:16:14.106490574+02:00"
