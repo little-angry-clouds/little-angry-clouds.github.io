@@ -43,14 +43,13 @@ else
     git checkout index.yaml
 fi
 
-# Update readme
-cp $charts/README.md README.md
+# Update index
 grep -v "^# Little" $charts/README.md > index.md
 
-check_if_readme_staged=$(git status --porcelain index.md README.md index.yaml)
+check_if_readme_staged=$(git status --porcelain index.md index.yaml)
 if [[ -n "$check_if_readme_staged" ]]
 then
     echo "Update README"
-    git add index.md README.md index.yaml
+    git add index.md index.yaml
     git commit -m "[ci] Update README"
 fi
