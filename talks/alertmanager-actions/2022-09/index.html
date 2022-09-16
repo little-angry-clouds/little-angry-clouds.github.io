@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>Ejecutar acciones con alertas de Prometheus</title>
+<meta name="author" content="drymer"/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.css"/>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/theme/blood.css" id="theme"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/plugin/highlight/zenburn.css"/>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section id="sec-title-slide">
+<h1 class="title">Ejecutar acciones con alertas de Prometheus</h1>
+</section>
+
+<section>
+<section id="slide-orgf4deb20">
+<h2 id="orgf4deb20">Problema</h2>
+<p>
+En ciertas ocasiones nos encontramos con que se da un problema de forma repetida que tal vez no podemos solucionar. Un ejemplo podría ser un servidor web que consume memoria hasta que se queda sin o una VPN que se cae por inactividad.
+</p>
+
+<p>
+Estos problemas tienen una forma correcta de solucionarse, pero es posible que no se pueda invertir el tiempo en ello o que aunque se invierta se tarde tiempo en solucionar. Y de mientras, sigue rompiéndose, siguen saltando las alertas y hay que ejecutar una serie de acciones de forma manual. Esto a su vez provoca que no se pueda investigar el problema raíz y se entra en un bucle sinsentido.
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-orgf064748">
+<h2 id="orgf064748">Solución</h2>
+<p>
+<code>alertmanager-actions</code> <b>*</b>\o/*
+</p>
+
+<p>
+Este componente es un receiver del Alertmanager, que es el componente que recibe las alertas que Prometheus detecta.
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-org505bce1">
+<h2 id="org505bce1">Contexto</h2>
+<p>
+<code>alertmanager-actions</code> es una herramienta acoplada totalmente a Alertmanager. No tanto a Prometheus, pero como es el estándar de facto que va de la mano de Alertmanager hablaremos de este.
+</p>
+
+</section>
+<section id="slide-orgc88fc1c">
+<h3 id="orgc88fc1c">Prometheus</h3>
+<p>
+Es una TSDB, esto es una Time Series DataBase. La diferencia entre este tipo de bases de datos y las SQL o NoSQL es que no se puede escoger el índice, este es la hora de ingestión del dato. Por ello, la hora es un componente muy importante en Prometheus. Para diferenciar las métricas entre si, además del tiempo se funciona con etiquetas del tipo clave valor.
+</p>
+
+</section>
+<section id="slide-org231fe90">
+<h4 id="org231fe90">Métricas</h4>
+<div class="org-src-container">
+
+<pre><code class="promql" >nginx_up{ec2_id="id-klwiwnas3", region="eu-west-1a", vpc_id="vpc-o10293912", os="ubuntu"}   1
+nginx_up{ec2_id="id-kasjweudcn", region="eu-west-1a", vpc_id="vpc-o10293912", os="debian"}  1
+</code></pre>
+</div>
+
+<p>
+Si consideramos que las métricas anteriores son cada una de una máquina distinta, podemos ejecutar consultas en base a sus etiquetas:
+</p>
+
+<div class="org-src-container">
+
+<pre><code class="promql" >nginx_up{os="ubuntu"}
+nginx_up{vpc_id="vpc-o10293912"}
+</code></pre>
+</div>
+
+<p>
+La primera consulta nos devolverá la métrica <code>nginx_up</code> que tenga la etiqueta os (Sistema Operativo) de ubuntu. La segunda devolverá las métricas de las instancias que esten en el vpc seleccionado.
+</p>
+
+<p>
+El valor 1 que se ve en la segunda columna seria el estado de la métrica. En este ejemplo, 1 significa que el servicio de nginx está arriba y 0 que no.
+</p>
+
+</section>
+<section id="slide-orgb2070ce">
+<h4 id="orgb2070ce">Alertas</h4>
+<p>
+Este ejemplo podria considerarse pseudocódigo en cuanto a que no está indentado de forma correcta ni tiene todo lo necesario para configurar Prometheus para que analice alertas. Pero contiene lo esencial para entender los parámetros básicos que se usa al crear una alerta.
+</p>
+
+<div class="org-src-container">
+
+<pre><code class="yaml" >- alert: NginxDown
+  expr: nginx_up != 1
+  for: 5m
+</code></pre>
+</div>
+
+<p>
+Esto crea una alerta llamada <code>NginxDown</code> que se activa cuando hay alguna métrica de <code>nginx_up</code> con un valor distinto a 1 más de cinco minutos.
+</p>
+
+<p>
+Igual que con las métricas, se pueden ejecutar consultas usando las alertas directamente:
+</p>
+
+<div class="org-src-container">
+
+<pre><code class="promql" >ALERTS{alertname="NginxDown", alertstate="firing", ec2_id="id-kasjweudcn", region="eu-west-1a", os="ubuntu", severity="none"}
+</code></pre>
+</div>
+
+</section>
+<section id="slide-orgc881e04">
+<h3 id="orgc881e04">Alertmanager</h3>
+<p>
+Alertmanager es el componente que recibe las alertas de prometheus. También depende mucho de las etiquetas, normalmente tiene disponibles las mismas que las propias métricas, lo cual será muy importante más adelante. Pero antes, un par de conceptos del Alertmanager.
+</p>
+
+</section>
+<section id="slide-org620cddf">
+<h4 id="org620cddf">Recibidor</h4>
+<p>
+Un receiver o recibidor (suena horrible) es un &laquo;destino&raquo; al que enviar una alerta. Cuando Alertmanager decide la ruta que seguirá una alerta recibida, saca la información del destino de esta sección. La siguiente configuración, igual que antes, se debe considerar pseudocódigo:
+</p>
+
+<div class="org-src-container">
+
+<pre><code class="yaml" >receivers:
+- name: none
+
+- name: slack
+  slack_configs:
+  - channel: alertas
+
+- name: mail
+  email_configs:
+  - to: alertas@amigothedevil.com
+
+- name: gchat
+  webhook_configs:
+    - url: "http://google-chat-receiver-calert:6000/dispatch"
+
+- name: alertmanager-actions
+  webhook_configs:
+  - send_resolved: false
+    url: "http://alertmanager-actions/"
+</code></pre>
+</div>
+
+</section>
+<section id="slide-orgb99cba0">
+<h4 id="orgb99cba0">Recibidor</h4>
+<p>
+Se pueden observar varios tipos de receivers:
+</p>
+<ul>
+<li><b><b>slack</b></b>: Como indica su nombre, envía la alerta por slack.</li>
+<li><b><b>email</b></b>: Como indica su nombre, envía la alerta por e-mail.</li>
+<li><b><b>webhook</b></b>: Como indica su nombre, envía la alerta por e-mail. Pero es el más polivalente, ya que al envíar una petición HTTP al destino configurado, pueden haber muchos servicios detrás. En este ejemplo, tenemos un receiver de Google Chat, que lo que hace es enviar las alertas por Google Chat. Y el otro es el que nos interesa, alertmanager-actions.</li>
+
+</ul>
+
+</section>
+<section id="slide-orgd687967">
+<h4 id="orgd687967">Rutas</h4>
+<p>
+Las rutas son los &laquo;caminos&raquo; que seguirá una alerta dependiendo de sus etiquetas. La siguiente configuración, igual que antes, se debe considerar pseudocódigo:
+</p>
+
+<div class="org-src-container">
+
+<pre><code class="yaml" >route:
+  receiver: gchat
+  routes:
+    - receiver: none
+      match:
+        severity: none
+    - receiver: alertmanager-actions
+      match:
+        actions: "true"
+    - receiver: gchat
+      match:
+        severity: warning
+    - receiver: slack
+        severity: critical
+</code></pre>
+</div>
+
+</section>
+<section id="slide-orge3d56da">
+<h4 id="orge3d56da">Rutas</h4>
+<p>
+Aquí tenemos varios receivers definidos.
+</p>
+<ul>
+<li><b><b>none</b></b>: como vimos arriba, no hace nada. A este receiver irán todas las alertas que tengan una etiqueta llamada severidad con valor nulo. La razón de esto es que normalmente si algo no es importante, no queremos saberlo, aunque haya una alerta configurada. Otro tema es por que podria haber una alerta configurada con una severidad nula, pero ese es otro tema.</li>
+<li><b><b>alertmanager-actions</b></b>: A este receiver se enviaran todas las alertas que contengan la etiqueta &laquo;actions&raquo; con el valor &laquo;true&rdquo;. Es importante definirle algún valor único que nos permita diferenciar las alertas sobre las que queremos lanzar acciones, para evitar sobrecargar innecesariamente al alertmanager-actions.</li>
+<li><b><b>gchat</b></b>: Se enviarán las alertas que tengan una severidad del tipo warning.</li>
+<li><b><b>slack</b></b>: Se enviarán las alertas que tengan una severidad del tipo critical.</li>
+
+</ul>
+
+</section>
+<section id="slide-orgc8ca362">
+<h3 id="orgc8ca362">Prometheus Operator</h3>
+<p>
+Miniresumen: El operador de Prometheus permite automatizar operaciones para configurar Prometheus sin downtime.
+</p>
+
+<p>
+Por defecto, Prometheus tiene un fichero de configuración con toda la configuración &laquo;general&raquo; y otra con la configuración de las alertas. Para facilitar la configuración de recolección de métricas y alertado de estas, existen dos recursos de Kubernetes. ServiceMonitor y PrometheusRule.
+</p>
+
+</section>
+<section id="slide-orga942ffc">
+<h4 id="orga942ffc">ServiceMonitor</h4>
+<p>
+Un servicemonitor es una forma de configurar Prometheus para que recoja las métricas de un componente. Por ejemplo:
+</p>
+
+<div class="org-src-container">
+
+<pre><code class="yaml" >apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    prometheus: generic
+  name: loki
+  namespace: monitoring
+spec:
+  endpoints:
+  - interval: 60s
+    port: http
+  selector:
+    matchLabels:
+      app: loki
+</code></pre>
+</div>
+
+<p>
+Esto configurará Prometheus para que recoja las métricas de cualquier componente de Kubernetes que tenga la etiqueta &laquo;app&raquo; con el valor &laquo;loki&raquo; que se encuentre en el namespace monitoring.
+</p>
+</section>
+<section id="slide-org409c838">
+<h4 id="org409c838">PrometheusRule</h4>
+<p>
+Un prometheusrule es una forma de configurar Prometheus para que evalue una alerta. Por ejemplo:
+</p>
+
+<div class="org-src-container">
+
+<pre><code class="yaml" >apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: generic
+  name: ec2-nginx
+  namespace: monitoring
+spec:
+  groups:
+    - name: ec2.rules
+      rules:
+        - alert: NginxDown
+          expr: nginx_up !=1
+          for: 5m
+</code></pre>
+</div>
+
+<p>
+Es el mismo ejemplo que pusimos en pseudocódigo más arriba. La alerta saltará cuando haya algún componente que tenga la métrica nginx<sub>up</sub> con un valor distinto a 1.
+</p>
+</section>
+</section>
+<section>
+<section id="slide-orgd6ccc2f">
+<h2 id="orgd6ccc2f">Configuración</h2>
+<div class="outline-text-2" id="text-orgd6ccc2f">
+</div>
+</section>
+<section id="slide-orgdc55ecf">
+<h3 id="orgdc55ecf">alertmanager-actions</h3>
+<p>
+Para que el receiver funcione, primero hay que configurarlo. El fichero de configuración tiene el siguiente formato:
+</p>
+
+<div class="org-src-container">
+
+<pre><code class="yaml" >- name: RestartProxy
+  labels:
+    alertname: NginxDown
+    action: restart
+  command:
+    - ips="$(aws ec2 describe-instances --filters Name=instance-state-name,Values=running Name=tag:Service,Values=Proxy Name=tag:Environment,Values=$ENVIRONMENT Name=tag:Component,Values=*$COMPONENT* --query Reservations[*].Instances[*].PrivateIpAddress --region eu-west-1 --output text)"
+    - for ip in $ips; do echo ssh -o StrictHostKeyChecking=no -i /secrets/ssh-vpn ec2-user@$ip sudo systemctl restart nginx; ssh -o StrictHostKeyChecking=no -i /secrets/ssh-vpn ec2-user@$ip sudo systemctl restart nginx; echo Done $ip; done
+</code></pre>
+</div>
+
+<p>
+La configuración consiste en una lista que recoge las características de cada acción:
+</p>
+<ul>
+<li>name: Nombre de la acción.</li>
+<li>labels: Las etiquetas que tiene que tener la alerta para que se active la accción/</li>
+<li>command: La acción a ejecutar, que seran <b><b>n</b></b> órdenes en bash.</li>
+
+</ul>
+</section>
+<section id="slide-org90dd863">
+<h3 id="org90dd863">alertmanager-actions</h3>
+<p>
+Esta acción lo que hace en concreto es: definir la variable <code>ips</code>, que contendrá el resultado de una búsqueda de todas las instancias de AWS que tengan las etiquetas <code>Service:Proxy</code>, <code>Environment:$ENVIRONMENT</code> y <code>Component:$COMPONENT</code>. La etiqueta de <code>Service</code> queda clara, pero puede venir la duda que significan las variables <code>ENVIRONMENT</code> y <code>COMPONENT</code>, ya que estas variables no se definen en ningún sitio. La respuesta es que son variables que se traducen directamente desde la alerta. Esto quiere decir que la alerta <code>NginxDown</code> tiene las etiquetas de entorno y componente, que pueden ser usadas tal cúal en el <code>alertmanager-actions</code>. Esto además de práctico, permite poder granular las acciones, ya que este tipo de información es totalmente necesaria para ejecutar acciones en general. Si no puedes acotar los componentes a los que afecta la alerta, aplicariamos las acciones a todos los componentes.
+</p>
+
+<p>
+La configuración de <code>command</code> es la más importante y al ser órdenes de bash que se aplican tal cual tiene mucha potencia pero también puede ser peligroso. Es importante evaluar la seguridad que pueda suponer el crear acciones de este tipo, ya que para que las acciones que resulten útiles se puedan ejecutar harán falta secretos: claves de AWS/GCP, claves ssh, &#x2026;
+</p>
+
+</section>
+<section id="slide-org9805681">
+<h3 id="org9805681">Acciones</h3>
+<p>
+Una acción es en realidad una alerta de Prometheus. Se le llama así para diferenciarla de una alerta normal, ya que el fin de una alerta es comunicar un mensaje y el de una acción ejecutar una acción, valga la redundancia.
+</p>
+
+<p>
+Un ejemplo que cuadre con la anterior configuración seria la siguiente, en formato PrometheusRule:
+</p>
+
+<div class="org-src-container">
+
+<pre><code class="yaml" >---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: generic
+  name: http-proxies
+  namespace: monitoring
+spec:
+  groups:
+  - name: nginx.rules
+    rules:
+    - alert: NginxDown
+      expr: nginx_up != 1
+      labels:
+        action: restart
+        actions: "true"
+      for: 30s
+</code></pre>
+</div>
+
+</section>
+<section id="slide-orgd566486">
+<h3 id="orgd566486">Acciones</h3>
+<p>
+Si esta acción se activase y se lanzáse contra el <code>alertmanager-actions</code>, esta se activaria ya que cumple los requisitos. Estos son:
+</p>
+<ul>
+<li>El nombre de la alerta es <code>NginxDown</code></li>
+<li>Tiene una etiqueta de acción llamada <code>restart</code></li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-orge805152">
+<h2 id="orge805152">Flujo de las acciones</h2>
+
+<div id="orge057da0" class="figure">
+<p><img src="./img/alertmanager-actions-diagram.png" alt="alertmanager-actions-diagram.png" />
+</p>
+</div>
+
+</section>
+</section>
+<section>
+<section id="slide-orgf074f60">
+<h2 id="orgf074f60">Problemas conocidos</h2>
+<ul>
+<li>No autoescala: Debido a que la gestión del bloqueo para no ejecutar más de una vez la misma alerta es interno, no pueden haber más de dos replicas. Para solucionarlo se tendria que guardar la información del bloqueo en un componente externo, como un Redis o una etcd.</li>
+
+</ul>
+</section>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js/plugin/notes/notes.js"></script>
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+
+controls: true,
+progress: true,
+history: false,
+center: true,
+slideNumber: 'c',
+rollingLinks: false,
+keyboard: true,
+mouseWheel: false,
+fragmentInURL: false,
+hashOneBasedIndex: false,
+pdfSeparateFragments: true,
+overview: true,
+width: 1500,
+height: 1000,
+margin: 0.10,
+minScale: 0.50,
+maxScale: 2.50,
+
+transition: 'fade',
+transitionSpeed: 'default',
+
+// Plugins with reveal.js 4.x
+plugins: [ RevealHighlight, RevealNotes ],
+
+// Optional libraries used to extend reveal.js
+dependencies: [
+]
+
+});
+</script>
+</body>
+</html>
